@@ -1,4 +1,4 @@
-# ninja
+# Portfolio Application
 
 A new Flutter application.
 
