@@ -16,11 +16,29 @@ class _ScanScreenState extends State<ScanScreen> {
   double height, width;
   String qrString = "Not Scanned";
   bool verified = false;
+  String registered;
+  String name = "";
   final _database=FirebaseDatabase.instance.reference();
   @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    _database.child('/count').onValue.listen((event) {
+      setState(() {
+        registered = event.snapshot.value['c'].toString();
+      });
+    });
+  }
+  @override
   Widget build(BuildContext context) {
-    height = MediaQuery.of(context).size.height;
-    width = MediaQuery.of(context).size.width;
+    height = MediaQuery
+        .of(context)
+        .size
+        .height;
+    width = MediaQuery
+        .of(context)
+        .size
+        .width;
     return Scaffold(
       appBar: AppBar(
         title: Text("Scan QR Code"),
@@ -28,57 +46,142 @@ class _ScanScreenState extends State<ScanScreen> {
       body: Column(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          Text(
+          (qrString=="Not Scanned")?Text(
             qrString,
             style: TextStyle(color: Colors.blue, fontSize: 30),
+          ):Text(""),
+          (qrString=="VALID QR")?Text(
+            qrString,
+            style: TextStyle(color: Colors.green, fontSize: 30),
+          ):Text(""),
+          (qrString=="Expired QR")?Text(
+            qrString,
+            style: TextStyle(color: Colors.red, fontSize: 30),
+          ):Text(""),
+          Text(
+            registered,
+            style: TextStyle(color: Colors.blue, fontSize: 50),
+          ),
+          Text(
+            name,
+            style: TextStyle(color: Colors.black, fontSize: 25),
           ),
           ElevatedButton(
-            onPressed: scanQR,
+            onPressed: (){
+              scanQR();
+          },
             child: Text("Scan QR Code"),
           ),
           SizedBox(width: width),
+          TextField(
+            decoration: InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: 'Enter UniqueID',
+              hintText: 'UNIQUE-ID',
+            ),
+            onSubmitted: (value){
+              scan(value);
+
+            },
+          )
         ],
       ),
     );
   }
 
   Future<void> scanQR() async {
-    try {
-      FlutterBarcodeScanner.scanBarcode("#2A99CF", "Cancel", true, ScanMode.QR)
-          .then((value) {
+
+      FlutterBarcodeScanner.scanBarcode("#2A99CF", "Cancel", true, ScanMode.QR).then((value) {
         setState(() {
           verified = false;
           qrString = "Not scanned";
         });
-        print(value);
-        _database.child('/1s1RE_npjE-WKMFIffDad9sRF9NKZUu7_sbdaKsD6kA8/Sheet1/${value}/').onValue.listen((event) {
+        // print(value);
+        _database.child('/Sheet2/${value}/').onValue.listen((event) {
 
-          final String nextOrder=event.snapshot.value['Count'].toString();
-          print(nextOrder);
+          final String nextOrder=event.snapshot.value['Count'].toString()[0];
+          // print("---->${nextOrder}");
           if(nextOrder=='1' && !verified){
             setState(() {
               qrString = "Expired QR";
+              name = value + " " + event.snapshot.value['Student Name'].toString();
 
               //print(nextOrder);
             });
+            return;
           }else if(nextOrder=='0' || verified){
-            _database.child('/1s1RE_npjE-WKMFIffDad9sRF9NKZUu7_sbdaKsD6kA8/Sheet1/${value}/').update({
-              'Count':'1'
-            });
+            if(!verified){
+              // print("updated");
+              _database.child('/Sheet2/${value}/').update({
+                'Count':'1'
+              });
+              _database.child('/count').update({'c':int.parse(registered)+1});
+
+            }
+// print("----------");
             setState(() {
+              // print("###");
+              name = value + " " + event.snapshot.value['Student Name'].toString();
+
               qrString = "VALID QR";
               verified = true;
               //print(nextOrder);
             });
+            // print("###return");
+            return;
           }
 
 
         });
       });
-    } catch (e) {
-      setState(() {
-        qrString = "unable to read the qr";
-      });
-    }
+      return;
+
+  }
+  Future<void> scan(String val) async {
+    setState(() {
+      name="";
+      qrString="Not Scanned";
+      verified=false;
+    });
+    String value =val.toUpperCase();
+    // print("--------------");
+    // print(value);
+    _database.child('/Sheet2/${value}/').onValue.listen((event) {
+
+      final String nextOrder=event.snapshot.value['Count'].toString()[0];
+      // print("---->${nextOrder}");
+      if(nextOrder=='1' && !verified){
+        setState(() {
+          qrString = "Expired QR";
+          name = value + " " + event.snapshot.value['Student Name'].toString();
+
+          //print(nextOrder);
+        });
+        return;
+      }else if(nextOrder=='0' || verified){
+        if(!verified){
+          // print("updated");
+          _database.child('/Sheet2/${value}/').update({
+            'Count':'1'
+          });
+          _database.child('/count').update({'c':int.parse(registered)+1});
+
+        }
+// print("----------");
+        setState(() {
+          // print("###");
+          name = value + " " + event.snapshot.value['Student Name'].toString();
+
+          qrString = "VALID QR";
+          verified = true;
+          //print(nextOrder);
+        });
+        // print("###return");
+        return;
+      }
+
+
+    });
+    return;
   }
 }
